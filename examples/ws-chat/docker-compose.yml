@@ -1,0 +1,37 @@
+services:
+  redis:
+    image: redis:7-alpine
+    # Not published to the host: only the chat nodes reach Redis, over the compose network.
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  chat-node-1:
+    build:
+      context: ../..
+      dockerfile: examples/ws-chat/Dockerfile
+    environment:
+      PORT: '4001'
+      NODE_ID: 'chat-node-1'
+      REDIS_URL: 'redis://redis:6379'
+    ports:
+      - '127.0.0.1:4001:4001'
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  chat-node-2:
+    build:
+      context: ../..
+      dockerfile: examples/ws-chat/Dockerfile
+    environment:
+      PORT: '4002'
+      NODE_ID: 'chat-node-2'
+      REDIS_URL: 'redis://redis:6379'
+    ports:
+      - '127.0.0.1:4002:4002'
+    depends_on:
+      redis:
+        condition: service_healthy

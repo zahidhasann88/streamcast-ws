@@ -1,0 +1,148 @@
+{
+  "name": "streamcast-ws",
+  "version": "0.1.0",
+  "description": "Durable room-based WebSocket scaling and session recovery across Node.js processes using Redis Streams",
+  "keywords": [
+    "websocket",
+    "ws",
+    "redis",
+    "redis-streams",
+    "pubsub",
+    "rooms",
+    "scaling",
+    "session-recovery",
+    "socket.io",
+    "realtime"
+  ],
+  "license": "MIT",
+  "author": "Zahid Hasan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zahid15/streamcast-ws.git"
+  },
+  "homepage": "https://github.com/zahid15/streamcast-ws#readme",
+  "bugs": {
+    "url": "https://github.com/zahid15/streamcast-ws/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./ws": {
+      "import": {
+        "types": "./dist/adapters/ws/index.d.ts",
+        "default": "./dist/adapters/ws/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/ws/index.d.cts",
+        "default": "./dist/adapters/ws/index.cjs"
+      }
+    },
+    "./recovery": {
+      "import": {
+        "types": "./dist/recovery/index.d.ts",
+        "default": "./dist/recovery/index.js"
+      },
+      "require": {
+        "types": "./dist/recovery/index.d.cts",
+        "default": "./dist/recovery/index.cjs"
+      }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/client/index.d.ts",
+        "default": "./dist/client/index.js"
+      },
+      "require": {
+        "types": "./dist/client/index.d.cts",
+        "default": "./dist/client/index.cjs"
+      }
+    },
+    "./socketio": {
+      "import": {
+        "types": "./dist/adapters/socketio/index.d.ts",
+        "default": "./dist/adapters/socketio/index.js"
+      },
+      "require": {
+        "types": "./dist/adapters/socketio/index.d.cts",
+        "default": "./dist/adapters/socketio/index.cjs"
+      }
+    },
+    "./protocol": {
+      "import": {
+        "types": "./dist/protocol/index.d.ts",
+        "default": "./dist/protocol/index.js"
+      },
+      "require": {
+        "types": "./dist/protocol/index.d.cts",
+        "default": "./dist/protocol/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "tsx bench/propagation.ts",
+    "prepublishOnly": "npm run format:check && npm run lint && npm run typecheck && npm run build"
+  },
+  "dependencies": {
+    "@types/ws": "^8.5.13",
+    "ioredis": "^6.0.0",
+    "ws": "^8.18.0"
+  },
+  "peerDependencies": {
+    "socket.io-adapter": "^2.5.0"
+  },
+  "peerDependenciesMeta": {
+    "socket.io-adapter": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.5",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.3.3",
+    "socket.io": "^4.8.1",
+    "socket.io-adapter": "^2.5.5",
+    "socket.io-client": "^4.8.1",
+    "tsup": "^9.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

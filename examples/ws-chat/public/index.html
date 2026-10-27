@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>streamcast-ws 2-Node Chat & Recovery Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      body {
+        max-width: 780px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.45;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }
+      input,
+      select,
+      button {
+        padding: 0.45rem 0.65rem;
+        font-size: 0.92rem;
+      }
+      #log {
+        border: 1px solid #8885;
+        border-radius: 6px;
+        height: 360px;
+        overflow-y: auto;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.85rem;
+      }
+      .entry {
+        margin-bottom: 0.35rem;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0.05rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        margin-right: 0.4rem;
+        background: #3b82f633;
+      }
+      .badge.replay {
+        background: #f59e0b44;
+      }
+      .badge.sys {
+        background: #10b98133;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>streamcast-ws — 2-Node Chat & Session Recovery Demo</h2>
+    <div class="bar">
+      <label>
+        Server Node:
+        <select id="nodeSelect">
+          <option value="ws://localhost:4001">Node 1 (ws://localhost:4001)</option>
+          <option value="ws://localhost:4002">Node 2 (ws://localhost:4002)</option>
+        </select>
+      </label>
+      <label>Room: <input id="roomInput" value="general" size="10" /></label>
+      <label>User: <input id="userInput" value="" size="10" /></label>
+      <button id="connectBtn">Connect / Switch Node</button>
+      <button id="disconnectBtn">Simulate Offline</button>
+    </div>
+    <div class="bar" style="font-size: 0.84rem; opacity: 0.85">
+      <span id="statusText">Disconnected</span>
+    </div>
+
+    <div id="log"></div>
+
+    <form id="chatForm" class="bar">
+      <input id="msgInput" placeholder="Type a message..." style="flex: 1" autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+
+    <script>
+      const logEl = document.getElementById('log');
+      const statusEl = document.getElementById('statusText');
+      const nodeSelect = document.getElementById('nodeSelect');
+      const roomInput = document.getElementById('roomInput');
+      const userInput = document.getElementById('userInput');
+      const msgInput = document.getElementById('msgInput');
+
+      userInput.value = 'user-' + Math.floor(100 + Math.random() * 900);
+      if (location.port === '4002') {
+        nodeSelect.value = 'ws://localhost:4002';
+      }
+
+      let ws = null;
+      let sessionId = sessionStorage.getItem('sc_sessionId') || undefined;
+      let lastEventId = sessionStorage.getItem('sc_lastEventId') || undefined;
+
+      function appendLog(kind, text) {
+        const div = document.createElement('div');
+        div.className = 'entry';
+        const badge = document.createElement('span');
+        badge.className = 'badge ' + (kind === 'REPLAY' ? 'replay' : kind === 'SYS' ? 'sys' : '');
+        badge.textContent = kind;
+        div.appendChild(badge);
+        div.appendChild(document.createTextNode(text));
+        logEl.appendChild(div);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function updateStatus(state) {
+        statusEl.textContent = `${state} | sessionId=${sessionId || 'none'} | lastEventId=${lastEventId || '0-0'}`;
+      }
+
+      function connect() {
+        if (ws) {
+          ws.onclose = null;
+          ws.close();
+        }
+        const url = nodeSelect.value + '?waitHello=1';
+        ws = new WebSocket(url);
+        updateStatus('Connecting to ' + nodeSelect.value + '...');
+
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ v: 1, type: 'hello', sessionId, lastEventId }));
+        };
+
+        ws.onmessage = (ev) => {
+          const frame = JSON.parse(ev.data);
+          if (frame.type === 'welcome') {
+            const hadPrev = Boolean(sessionId);
+            sessionId = frame.sessionId;
+            lastEventId = frame.lastEventId;
+            sessionStorage.setItem('sc_sessionId', sessionId);
+            sessionStorage.setItem('sc_lastEventId', lastEventId);
+            updateStatus('Connected (' + nodeSelect.value + ')');
+
+            appendLog(
+              'SYS',
+              `welcome: recovered=${frame.recovered} reason=${frame.reason} rooms=[${frame.rooms.join(', ')}]`,
+            );
+            if (hadPrev && !frame.recovered) {
+              appendLog(
+                'SYS',
+                'Stream trimmed or session expired — trigger full state resync here!',
+              );
+            }
+            const desiredRoom = roomInput.value.trim() || 'general';
+            if (!frame.rooms.includes(desiredRoom)) {
+              ws.send(JSON.stringify({ v: 1, type: 'join', room: desiredRoom }));
+            }
+          } else if (frame.type === 'joined') {
+            appendLog('SYS', `joined room "${frame.room}"`);
+          } else if (frame.type === 'replay' || frame.type === 'event') {
+            lastEventId = frame.id;
+            sessionStorage.setItem('sc_lastEventId', lastEventId);
+            ws.send(JSON.stringify({ v: 1, type: 'ack', id: frame.id }));
+            updateStatus('Connected (' + nodeSelect.value + ')');
+            const d = frame.data || {};
+            appendLog(
+              frame.type === 'replay' ? 'REPLAY' : 'LIVE',
+              `[${frame.room}] (${d.originNode || '?'}) ${d.user || 'anon'}: ${d.text}`,
+            );
+          } else if (frame.type === 'replay_complete') {
+            appendLog('SYS', `replay_complete: ${frame.count} missed message(s) restored`);
+          }
+        };
+
+        ws.onclose = () => updateStatus('Offline (session preserved for recovery)');
+      }
+
+      document.getElementById('connectBtn').onclick = () => connect();
+      document.getElementById('disconnectBtn').onclick = () => {
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+      };
+
+      document.getElementById('chatForm').onsubmit = (e) => {
+        e.preventDefault();
+        const text = msgInput.value.trim();
+        if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(
+          JSON.stringify({
+            v: 1,
+            type: 'message',
+            room: roomInput.value.trim() || 'general',
+            data: { user: userInput.value.trim() || 'anon', text },
+          }),
+        );
+        msgInput.value = '';
+      };
+
+      connect();
+    </script>
+  </body>
+</html>
